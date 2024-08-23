@@ -8,8 +8,6 @@ on:
 jobs:
   create_tag:
     runs-on: ubuntu-latest
-    outputs:
-      created_tag: ${{ steps.compare_versions.outputs.created_tag }}
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -24,31 +22,27 @@ jobs:
         run: |
           version=$(grep "^version" backend/pyproject.toml | sed -E 's/version = "(.*)"/\1/')
           echo "version=$version" >> $GITHUB_ENV
-          echo "VERSION=$version" >> $GITHUB_ENV  # Pass it as an environment variable
 
       - name: Get the latest tag (if exists)
         id: get_latest_tag
         run: |
           latest_tag=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
           echo "latest_tag=$latest_tag" >> $GITHUB_ENV
-          echo "LATEST_TAG=$latest_tag" >> $GITHUB_ENV  # Pass it as an environment variable
 
       - name: Compare versions
         id: compare_versions
         run: |
-          if [ "v${{ env.VERSION }}" = "${{ env.LATEST_TAG }}" ]; then
+          if [ "v${{ env.version }}" = "${{ env.latest_tag }}" ]; then
             echo "Version has not changed. Skipping tag creation."
             echo "created_tag=false" >> $GITHUB_ENV
             exit 0
           else
             echo "created_tag=true" >> $GITHUB_ENV
           fi
-        outputs:
-          created_tag: ${{ env.created_tag }}
 
       - name: Create a new tag
-        if: ${{ steps.compare_versions.outputs.created_tag == 'true' }}
+        if: ${{ env.created_tag == 'true' }}
         id: create_tag
         run: |
-          git tag -a v${{ env.VERSION }} -m "Release v${{ env.VERSION }}"
-          git push origin v${{ env.VERSION }}"
+          git tag -a v${{ env.version }} -m "Release v${{ env.version }}"
+          git push origin v${{ env.version }}"
