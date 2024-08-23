@@ -44,9 +44,16 @@ jobs:
     - name: Install Node.js
       uses: actions/setup-node@v4
       with:
-        node-version: 20
-        cache: "pnpm"
-    # 安装依赖
+         node-version: 20.11.0
+
+    - name: Cache pnpm modules
+      uses: actions/cache@v3
+      with:
+        path: frontend/node_modules
+        key: ${{ runner.os }}-pnpm-store-${{ hashFiles('frontend/pnpm-lock.yaml') }}
+        restore-keys: |
+          ${{ runner.os }}-pnpm-store-
+        # 安装依赖
     - name: Install dependencies
       run: |
          cd frontend
