@@ -72,7 +72,7 @@ jobs:
     - name: Download files
       run: |
          cd backend
-         python hub_model/download.py
+         pdm run python hub_model/download.py
     
     - name: Build with PyInstaller
       run: |
