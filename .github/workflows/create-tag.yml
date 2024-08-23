@@ -47,7 +47,7 @@ jobs:
           fi
     
       - name: Create a new tag
-        if: ${{ env.created_tag == 'true' }}
+        if: ${{ env.created_tag == true }}
         id: create_tag
         run: |
           echo ${{ env.created_tag }}
