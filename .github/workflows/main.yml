@@ -1,0 +1,120 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build-and-release:
+    strategy:
+      matrix:
+        os: [windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.12.4'
+    
+    - name: Cache PDM packages
+      uses: actions/cache@v3
+      with:
+        path: ~/.pdm/venv
+        key: ${{ matrix.os }}-pdm-${{ hashFiles('**/pdm.lock') }}
+        restore-keys: |
+          ${{ matrix.os }}-pdm-
+    
+    - name: Install dependencies
+      run: |
+        cd backebd
+        pip install pdm
+        pdm install
+
+    - uses: pnpm/action-setup@v4
+      name: Install pnpm
+      with:
+        version: 8
+        run_install: false
+
+    - name: Install Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: 20
+        cache: "pnpm"
+    # 安装依赖
+    - name: Install dependencies
+      run: |
+         cd frontend
+         pnpm install
+
+    - name: build frontend
+      run: |
+        cd backened
+        pdm build-front
+
+    - name: Cache downloaded files
+      uses: actions/cache@v3
+      with:
+        path: ./hub_model/briaai
+        key: ${{ runner.os }}-downloads-${{ hashFiles('hub_model/download.py') }}
+    - name: Download files
+      run: |
+         cd backend
+         python hub_model/download.py
+    
+    - name: Build with PyInstaller
+      run: |
+        cd backend
+        pdm build-release
+      
+    - name: Create ZIP (macOS)
+      if: matrix.os == 'macos-latest'
+      run: |
+        cd dist/release
+        zip -r ../../mac-binary-image-matting-${{ github.ref_name }}.zip .
+        cd ../../
+      
+    - name: Create ZIP (Windows)
+      if: matrix.os == 'windows-latest'
+      run: |
+        Compress-Archive -Path .\dist\release\* -DestinationPath win-image-matting-${{ github.ref_name }}.zip
+      shell: pwsh
+      
+    - name: Create Release
+      id: create_release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ github.ref }}
+        release_name: Image Matting ${{ github.ref_name }}
+        draft: false
+        prerelease: false
+      if: matrix.os == 'windows-latest'  # 只在Windows job中创建release
+    
+    - name: Upload Windows Release Asset
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./win-image-matting-${{ github.ref_name }}.zip
+        asset_name: win-image-matting-${{ github.ref_name }}.zip
+        asset_content_type: application/zip
+      if: matrix.os == 'windows-latest'
+    
+    - name: Upload macOS Release Asset
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./mac-binary-image-matting-${{ github.ref_name }}.zip
+        asset_name: mac-binary-image-matting-${{ github.ref_name }}.zip
+        asset_content_type: application/zip
+      if: matrix.os == 'macos-latest'
