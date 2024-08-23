@@ -35,33 +35,26 @@ jobs:
             latest_tag="v0.0.0"
           fi
           echo "::set-output name=tag::$latest_tag"
-
       - name: Compare versions
         id: compare_versions
         run: |
           if [ "v${{ steps.get_version.outputs.version }}" = "${{ steps.get_latest_tag.outputs.tag }}" ]; then
             echo "Version has not changed. Skipping tag creation."
-            echo "::set-output name=created_tag::false"
+            echo "created_tag=false" >> $GITHUB_ENV
             exit 0
           else
-            echo "::set-output name=created_tag::true"
+            echo "created_tag=true" >> $GITHUB_ENV
           fi
-      - name: Check if tag exists
-        id: check_tag
-        run: |
-          if git rev-parse "refs/tags/v${{ steps.get_version.outputs.version }}" >/dev/null 2>&1; then
-            echo "Tag v${{ steps.get_version.outputs.version }} already exists."
-            echo "::set-output name=exists::true"
-          else
-            echo "::set-output name=exists::false"
-          fi
-
+    
       - name: Create a new tag
-        if: steps.check_tag.outputs.exists == 'false'
+        if: ${{ env.created_tag == 'true' }}
         id: create_tag
         run: |
+          echo ${{ env.created_tag }}
           git tag -a v${{ steps.get_version.outputs.version }} -m "Release v${{ steps.get_version.outputs.version }}"
           git push origin v${{ steps.get_version.outputs.version }}
-          echo "::set-output name=tag::v${{ steps.get_version.outputs.version }}"
+          echo "tag=v${{ steps.get_version.outputs.version }}" >> $GITHUB_ENV
+          
+
 
 
