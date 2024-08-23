@@ -1,4 +1,3 @@
-# .github/workflows/create-tag.yml
 name: Create Tag
 
 on:
@@ -24,37 +23,32 @@ jobs:
         id: get_version
         run: |
           version=$(grep "^version" backend/pyproject.toml | sed -E 's/version = "(.*)"/\1/')
-          echo "::set-output name=version::$version"
+          echo "version=$version" >> $GITHUB_ENV
+          echo "VERSION=$version" >> $GITHUB_ENV  # Pass it as an environment variable
 
       - name: Get the latest tag (if exists)
         id: get_latest_tag
         run: |
-          if git rev-parse "v0.0.0" >/dev/null 2>&1; then
-            latest_tag=$(git describe --tags --abbrev=0)
-          else
-            latest_tag="v0.0.0"
-          fi
-          echo "::set-output name=tag::$latest_tag"
+          latest_tag=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+          echo "latest_tag=$latest_tag" >> $GITHUB_ENV
+          echo "LATEST_TAG=$latest_tag" >> $GITHUB_ENV  # Pass it as an environment variable
+
       - name: Compare versions
         id: compare_versions
         run: |
-          if [ "v${{ steps.get_version.outputs.version }}" = "${{ steps.get_latest_tag.outputs.tag }}" ]; then
+          if [ "v${{ env.VERSION }}" = "${{ env.LATEST_TAG }}" ]; then
             echo "Version has not changed. Skipping tag creation."
             echo "created_tag=false" >> $GITHUB_ENV
             exit 0
           else
             echo "created_tag=true" >> $GITHUB_ENV
           fi
-    
+        outputs:
+          created_tag: ${{ env.created_tag }}
+
       - name: Create a new tag
-        if: ${{ env.created_tag == true }}
+        if: ${{ steps.compare_versions.outputs.created_tag == 'true' }}
         id: create_tag
         run: |
-          echo ${{ env.created_tag }}
-          git tag -a v${{ steps.get_version.outputs.version }} -m "Release v${{ steps.get_version.outputs.version }}"
-          git push origin v${{ steps.get_version.outputs.version }}
-          echo "tag=v${{ steps.get_version.outputs.version }}" >> $GITHUB_ENV
-          
-
-
-
+          git tag -a v${{ env.VERSION }} -m "Release v${{ env.VERSION }}"
+          git push origin v${{ env.VERSION }}"
