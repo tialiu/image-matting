@@ -1,0 +1,45 @@
+# .github/workflows/create-tag.yml
+name: Create Tag
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  create_tag:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v2
+
+      - name: Set up Git
+        run: |
+          git config --global user.name "GitHub Actions"
+          git config --global user.email "actions@github.com"
+
+      - name: Extract version from pyproject.toml
+        id: get_version
+        run: |
+          version=$(grep "^version" backend/pyproject.toml | sed -E 's/version = "(.*)"/\1/')
+          echo "::set-output name=version::$version"
+
+      - name: Get the latest tag
+        id: get_latest_tag
+        run: |
+          latest_tag=$(git describe --tags --abbrev=0)
+          echo "::set-output name=tag::$latest_tag"
+
+      - name: Compare versions
+        id: compare_versions
+        run: |
+          if [ "${{ steps.get_version.outputs.version }}" = "${{ steps.get_latest_tag.outputs.tag }}" ]; then
+            echo "Version has not changed. Skipping tag creation."
+            exit 0
+          fi
+
+      - name: Create a new tag
+        if: ${{ steps.compare_versions.outcome == 'success' }}
+        run: |
+          git tag -a v${{ steps.get_version.outputs.version }} -m "Release v${{ steps.get_version.outputs.version }}"
+          git push origin v${{ steps.get_version.outputs.version }}
