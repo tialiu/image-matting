@@ -31,7 +31,7 @@ jobs:
     
     - name: Install dependencies
       run: |
-        cd backebd
+        cd backend
         pip install pdm
         pdm install
 
@@ -54,7 +54,7 @@ jobs:
 
     - name: build frontend
       run: |
-        cd backened
+        cd backend
         pdm build-front
 
     - name: Cache downloaded files
