@@ -9,7 +9,7 @@ on:
       
 jobs:
   build-and-release:
-    if: ${{ needs.create_tag.outputs.created_tag == 'true' }}
+    if: ${{ github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.outputs.created_tag == 'true' }}
     strategy:
       matrix:
         os: [windows-latest, macos-latest]
