@@ -3,7 +3,7 @@ name: Build and Release
 on:
   push:
     tags:
-      - 'v*'
+      - 'main'
 
 jobs:
   build-and-release:
@@ -82,12 +82,13 @@ jobs:
     - name: Create ZIP (macOS)
       if: matrix.os == 'macos-latest'
       run: |
-        cd dist/release
+        cd backend/dist/release
         zip -r ../../mac-binary-image-matting-${{ github.ref_name }}.zip .
         cd ../../
       
     - name: Create ZIP (Windows)
       if: matrix.os == 'windows-latest'
+      working-directory: backend
       run: |
         Compress-Archive -Path .\dist\release\* -DestinationPath win-image-matting-${{ github.ref_name }}.zip
       shell: pwsh
