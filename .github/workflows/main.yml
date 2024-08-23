@@ -2,60 +2,11 @@ name: Create Release
 
 on:
   push:
-    branches:
-      - main
-
+    tags:
+      - 'v*'  
       
 jobs:
-  create_tag:
-    runs-on: ubuntu-latest
-    outputs:
-      created_tag: ${{ steps.compare_versions.outputs.created_tag }}
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
-
-      - name: Set up Git
-        run: |
-          git config --global user.name "GitHub Actions"
-          git config --global user.email "actions@github.com"
-
-      - name: Extract version from pyproject.toml
-        id: get_version
-        run: |
-          version=$(grep "^version" backend/pyproject.toml | sed -E 's/version = "(.*)"/\1/')
-          echo "::set-output name=version::$version"
-
-      - name: Get the latest tag (if exists)
-        id: get_latest_tag
-        run: |
-          if git rev-parse "v0.0.0" >/dev/null 2>&1; then
-            latest_tag=$(git describe --tags --abbrev=0)
-          else
-            latest_tag="v0.0.0"
-          fi
-          echo "::set-output name=tag::$latest_tag"
-
-      - name: Compare versions
-        id: compare_versions
-        run: |
-          if [ "v${{ steps.get_version.outputs.version }}" = "${{ steps.get_latest_tag.outputs.tag }}" ]; then
-            echo "Version has not changed. Skipping tag creation."
-            echo "::set-output name=created_tag::false"
-            exit 0
-          else
-            echo "::set-output name=created_tag::true"
-          fi
-
-      - name: Create a new tag
-        if: ${{ steps.compare_versions.outputs.created_tag == 'true' }}
-        id: create_tag
-        run: |
-          git tag -a v${{ steps.get_version.outputs.version }} -m "Release v${{ steps.get_version.outputs.version }}"
-          git push origin v${{ steps.get_version.outputs.version }}
-          echo "::set-output name=tag::v${{ steps.get_version.outputs.version }}"
   build-and-release:
-    if: ${{ needs.create_tag.outputs.created_tag == 'true' }}
     strategy:
       matrix:
         os: [windows-latest, macos-latest]
