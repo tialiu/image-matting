@@ -46,12 +46,22 @@ jobs:
           else
             echo "::set-output name=created_tag::true"
           fi
+      - name: Check if tag exists
+        id: check_tag
+        run: |
+          if git rev-parse "refs/tags/v${{ steps.get_version.outputs.version }}" >/dev/null 2>&1; then
+            echo "Tag v${{ steps.get_version.outputs.version }} already exists."
+            echo "::set-output name=exists::true"
+          else
+            echo "::set-output name=exists::false"
+          fi
 
       - name: Create a new tag
-        if: ${{ steps.compare_versions.outputs.created_tag == 'true' }}
+        if: steps.check_tag.outputs.exists == 'false'
         id: create_tag
         run: |
           git tag -a v${{ steps.get_version.outputs.version }} -m "Release v${{ steps.get_version.outputs.version }}"
           git push origin v${{ steps.get_version.outputs.version }}
           echo "::set-output name=tag::v${{ steps.get_version.outputs.version }}"
+
 
