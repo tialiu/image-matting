@@ -9,9 +9,11 @@ on:
 jobs:
   create_tag:
     runs-on: ubuntu-latest
+    outputs:
+      created_tag: ${{ steps.compare_versions.outputs.created_tag }}
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
 
       - name: Set up Git
         run: |
@@ -39,11 +41,16 @@ jobs:
         run: |
           if [ "v${{ steps.get_version.outputs.version }}" = "${{ steps.get_latest_tag.outputs.tag }}" ]; then
             echo "Version has not changed. Skipping tag creation."
+            echo "::set-output name=created_tag::false"
             exit 0
+          else
+            echo "::set-output name=created_tag::true"
           fi
 
       - name: Create a new tag
-        if: ${{ steps.compare_versions.outcome == 'success' }}
+        if: ${{ steps.compare_versions.outputs.created_tag == 'true' }}
+        id: create_tag
         run: |
           git tag -a v${{ steps.get_version.outputs.version }} -m "Release v${{ steps.get_version.outputs.version }}"
-          git push origin v${{ steps.get_version.outputs.version }}
+          git push origin v${{ steps.get_version.outputs.version }}"
+          echo "::set-output name=tag::v${{ steps.get_version.outputs.version }}"
