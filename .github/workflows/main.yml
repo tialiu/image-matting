@@ -103,7 +103,7 @@ jobs:
         release_name: Image Matting ${{ github.ref_name }}
         draft: false
         prerelease: false
-      if: matrix.os == 'windows-latest'  # 只在Windows job中创建release
+        
     
     - name: Upload Windows Release Asset
       uses: actions/upload-release-asset@v1
