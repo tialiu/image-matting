@@ -9,6 +9,7 @@ on:
       
 jobs:
   build-and-release:
+    if: ${{ needs.create_tag.outputs.created_tag == 'true' }}
     strategy:
       matrix:
         os: [windows-latest, macos-latest]
@@ -95,24 +96,36 @@ jobs:
         Compress-Archive -Path .\dist\release\* -DestinationPath win-image-matting-${{ github.ref_name }}.zip
       shell: pwsh
       
-    - name: Create Release
+    - name: Find Latest Release
+      id: find_latest_release
+      uses: octokit/request-action@v2
+      with:
+        route: GET /repos/{owner}/{repo}/releases/latest
+        owner: ${{ github.repository_owner }}
+        repo: ${{ github.repository }}
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      continue-on-error: true
+
+    - name: Create Release if not exists
       id: create_release
+      if: steps.find_latest_release.outputs.status_code == '404'
       uses: actions/create-release@v1
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
-        tag_name: ${{ github.ref }}
+        tag_name: ${{ github.ref_name }}
         release_name: Image Matting ${{ github.ref_name }}
         draft: false
         prerelease: false
-        
-    
+
+      
     - name: Upload Windows Release Asset
       uses: actions/upload-release-asset@v1
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        upload_url: ${{ steps.find_latest_release.outputs.upload_url || steps.create_release.outputs.upload_url }}
         asset_path: ./win-image-matting-${{ github.ref_name }}.zip
         asset_name: win-image-matting-${{ github.ref_name }}.zip
         asset_content_type: application/zip
@@ -123,7 +136,7 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        upload_url: ${{ steps.find_latest_release.outputs.upload_url || steps.create_release.outputs.upload_url }}
         asset_path: ./mac-binary-image-matting-${{ github.ref_name }}.zip
         asset_name: mac-binary-image-matting-${{ github.ref_name }}.zip
         asset_content_type: application/zip
