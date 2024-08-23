@@ -24,16 +24,20 @@ jobs:
           version=$(grep "^version" backend/pyproject.toml | sed -E 's/version = "(.*)"/\1/')
           echo "::set-output name=version::$version"
 
-      - name: Get the latest tag
+      - name: Get the latest tag (if exists)
         id: get_latest_tag
         run: |
-          latest_tag=$(git describe --tags --abbrev=0)
+          if git rev-parse "v0.0.0" >/dev/null 2>&1; then
+            latest_tag=$(git describe --tags --abbrev=0)
+          else
+            latest_tag="v0.0.0"
+          fi
           echo "::set-output name=tag::$latest_tag"
 
       - name: Compare versions
         id: compare_versions
         run: |
-          if [ "${{ steps.get_version.outputs.version }}" = "${{ steps.get_latest_tag.outputs.tag }}" ]; then
+          if [ "v${{ steps.get_version.outputs.version }}" = "${{ steps.get_latest_tag.outputs.tag }}" ]; then
             echo "Version has not changed. Skipping tag creation."
             exit 0
           fi
