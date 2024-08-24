@@ -23,10 +23,16 @@ jobs:
           version=$(grep "^version" backend/pyproject.toml | sed -E 's/version = "(.*)"/\1/')
           echo "version=$version" >> $GITHUB_ENV
 
-      - name: Get the latest tag (if exists)
+      - name: Get the latest tag
         id: get_latest_tag
         run: |
+          git fetch --tags
           latest_tag=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+          if [ "$latest_tag" = "v0.0.0" ]; then
+            echo "No existing tags found. Using v0.0.0 as the starting point."
+          else
+            echo "Latest tag: $latest_tag"
+          fi
           echo "latest_tag=$latest_tag" >> $GITHUB_ENV
 
       - name: Compare versions
