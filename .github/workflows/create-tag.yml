@@ -167,16 +167,17 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./win-image-matting-${{ needs.check-and-tag.outputs.version }}.zip
+          asset_path: backend/win-image-matting-${{ needs.check-and-tag.outputs.version }}.zip
           asset_name: win-image-matting-${{ needs.check-and-tag.outputs.version }}.zip
           asset_content_type: application/zip
-
+      
       - name: Upload macOS Release Asset
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./mac-binary-image-matting-${{ needs.check-and-tag.outputs.version }}.zip
+          asset_path: backend/mac-binary-image-matting-${{ needs.check-and-tag.outputs.version }}.zip
           asset_name: mac-binary-image-matting-${{ needs.check-and-tag.outputs.version }}.zip
           asset_content_type: application/zip
+
