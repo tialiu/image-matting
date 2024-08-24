@@ -6,13 +6,11 @@ on:
       - main
 
 jobs:
-  tag-and-build:
+  check-and-tag:
     runs-on: ubuntu-latest
-    if: steps.compare_versions.outputs.created_tag == 'true'  # 如果创建了标签才执行
-    strategy:
-      matrix:
-        os: [windows-latest, macos-latest]
-
+    outputs:
+      created_tag: ${{ steps.compare_versions.outputs.created_tag }}
+      version: ${{ steps.get_version.outputs.version }}
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -52,6 +50,17 @@ jobs:
         run: |
           git tag -a v${{ steps.get_version.outputs.version }} -m "Release v${{ steps.get_version.outputs.version }}"
           git push https://x-access-token:${{ secrets.PERSONAL_ACCESS_TOKEN }}@github.com/${{ github.repository }}.git v${{ steps.get_version.outputs.version }}
+
+  tag-and-build:
+    runs-on: ubuntu-latest
+    needs: check-and-tag
+    if: needs.check-and-tag.outputs.created_tag == 'true'
+    strategy:
+      matrix:
+        os: [windows-latest, macos-latest]
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
 
       - name: Set up Python
         uses: actions/setup-python@v4
@@ -121,20 +130,20 @@ jobs:
         if: matrix.os == 'macos-latest'
         run: |
           cd backend/dist/release
-          zip -r ../../mac-binary-image-matting-${{ github.ref_name }}.zip .
+          zip -r ../../mac-binary-image-matting-${{ needs.check-and-tag.outputs.version }}.zip .
           cd ../../
 
       - name: Create ZIP (Windows)
         if: matrix.os == 'windows-latest'
         working-directory: backend
         run: |
-          Compress-Archive -Path .\dist\release\* -DestinationPath win-image-matting-${{ github.ref_name }}.zip
+          Compress-Archive -Path .\dist\release\* -DestinationPath win-image-matting-${{ needs.check-and-tag.outputs.version }}.zip
         shell: pwsh
 
   release:
     runs-on: ubuntu-latest
     needs: tag-and-build
-    if: needs.tag-and-build.outputs.created_tag == 'true'
+    if: needs.check-and-tag.outputs.created_tag == 'true'
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -145,8 +154,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tag_name: v${{ needs.tag-and-build.steps.get_version.outputs.version }}
-          release_name: Image Matting v${{ needs.tag-and-build.steps.get_version.outputs.version }}
+          tag_name: v${{ needs.check-and-tag.outputs.version }}
+          release_name: Image Matting v${{ needs.check-and-tag.outputs.version }}
           draft: false
           prerelease: false
 
@@ -156,8 +165,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./win-image-matting-${{ needs.tag-and-build.steps.get_version.outputs.version }}.zip
-          asset_name: win-image-matting-${{ needs.tag-and-build.steps.get_version.outputs.version }}.zip
+          asset_path: ./win-image-matting-${{ needs.check-and-tag.outputs.version }}.zip
+          asset_name: win-image-matting-${{ needs.check-and-tag.outputs.version }}.zip
           asset_content_type: application/zip
 
       - name: Upload macOS Release Asset
@@ -166,6 +175,6 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./mac-binary-image-matting-${{ needs.tag-and-build.steps.get_version.outputs.version }}.zip
-          asset_name: mac-binary-image-matting-${{ needs.tag-and-build.steps.get_version.outputs.version }}.zip
+          asset_path: ./mac-binary-image-matting-${{ needs.check-and-tag.outputs.version }}.zip
+          asset_name: mac-binary-image-matting-${{ needs.check-and-tag.outputs.version }}.zip
           asset_content_type: application/zip
