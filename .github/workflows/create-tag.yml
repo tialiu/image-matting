@@ -46,3 +46,5 @@ jobs:
         run: |
           git tag -a v${{ env.version }} -m "Release v${{ env.version }}"
           git push origin v${{ env.version }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.PAT }}
