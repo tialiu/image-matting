@@ -6,8 +6,9 @@ on:
       - main
 
 jobs:
-  tag-build-release:
+  tag-and-build:
     runs-on: ubuntu-latest
+    if: steps.compare_versions.outputs.created_tag == 'true'  # 如果创建了标签才执行
     strategy:
       matrix:
         os: [windows-latest, macos-latest]
@@ -130,15 +131,22 @@ jobs:
           Compress-Archive -Path .\dist\release\* -DestinationPath win-image-matting-${{ github.ref_name }}.zip
         shell: pwsh
 
+  release:
+    runs-on: ubuntu-latest
+    needs: tag-and-build
+    if: needs.tag-and-build.outputs.created_tag == 'true'
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
       - name: Create Release
         id: create_release
-        if: steps.compare_versions.outputs.created_tag == 'true'
         uses: actions/create-release@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tag_name: v${{ steps.get_version.outputs.version }}
-          release_name: Image Matting v${{ steps.get_version.outputs.version }}
+          tag_name: v${{ needs.tag-and-build.steps.get_version.outputs.version }}
+          release_name: Image Matting v${{ needs.tag-and-build.steps.get_version.outputs.version }}
           draft: false
           prerelease: false
 
@@ -148,10 +156,9 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./win-image-matting-${{ github.ref_name }}.zip
-          asset_name: win-image-matting-${{ github.ref_name }}.zip
+          asset_path: ./win-image-matting-${{ needs.tag-and-build.steps.get_version.outputs.version }}.zip
+          asset_name: win-image-matting-${{ needs.tag-and-build.steps.get_version.outputs.version }}.zip
           asset_content_type: application/zip
-        if: matrix.os == 'windows-latest'
 
       - name: Upload macOS Release Asset
         uses: actions/upload-release-asset@v1
@@ -159,7 +166,6 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./mac-binary-image-matting-${{ github.ref_name }}.zip
-          asset_name: mac-binary-image-matting-${{ github.ref_name }}.zip
+          asset_path: ./mac-binary-image-matting-${{ needs.tag-and-build.steps.get_version.outputs.version }}.zip
+          asset_name: mac-binary-image-matting-${{ needs.tag-and-build.steps.get_version.outputs.version }}.zip
           asset_content_type: application/zip
-        if: matrix.os == 'macos-latest'
