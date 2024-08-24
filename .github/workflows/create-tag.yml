@@ -148,13 +148,24 @@ jobs:
         run: |
           cd backend
           pdm build-release
+      - name: List file sizes (macOS)
+        if: matrix.os == 'macos-latest'
+        run: |
+          du -sh backend/dist/release/image-matting/_internal/*
 
       - name: Create ZIP (macOS)
         if: matrix.os == 'macos-latest'
         run: |
           cd backend/dist/release
-          zip -r ../../mac-binary-image-matting-${{ needs.check-and-tag.outputs.version }}.zip .
+          zip -r ../../mac-binary-image-matting-${{ needs.check-and-tag.outputs.version }}.zip . -x 'nvidia/*'
           cd ../../
+
+      - name: List file sizes (Windows)
+        if: matrix.os == 'windows-latest'
+        working-directory: backend
+        run: |
+          Get-ChildItem -Recurse .\dist\release | Measure-Object -Property Length -Sum | Select-Object Sum
+        shell: pwsh
 
       - name: Create ZIP (Windows)
         if: matrix.os == 'windows-latest'
