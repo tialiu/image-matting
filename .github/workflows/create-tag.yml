@@ -11,6 +11,8 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # 获取完整的历史记录，包括所有标签
 
       - name: Set up Git
         run: |
@@ -21,7 +23,7 @@ jobs:
         id: get_version
         run: |
           version=$(grep "^version" backend/pyproject.toml | sed -E 's/version = "(.*)"/\1/')
-          echo "version=$version" >> $GITHUB_ENV
+          echo "version=$version" >> $GITHUB_OUTPUT
 
       - name: Get the latest tag
         id: get_latest_tag
@@ -33,24 +35,22 @@ jobs:
           else
             echo "Latest tag: $latest_tag"
           fi
-          echo "latest_tag=$latest_tag" >> $GITHUB_ENV
+          echo "latest_tag=$latest_tag" >> $GITHUB_OUTPUT
 
       - name: Compare versions
         id: compare_versions
         run: |
-          if [ "v${{ env.version }}" = "${{ env.latest_tag }}" ]; then
+          if [ "v${{ steps.get_version.outputs.version }}" = "${{ steps.get_latest_tag.outputs.latest_tag }}" ]; then
             echo "Version has not changed. Skipping tag creation."
-            echo "created_tag=false" >> $GITHUB_ENV
-            exit 0
+            echo "created_tag=false" >> $GITHUB_OUTPUT
           else
-            echo "created_tag=true" >> $GITHUB_ENV
+            echo "created_tag=true" >> $GITHUB_OUTPUT
           fi
 
       - name: Create a new tag
-        if: ${{ env.created_tag == 'true' }}
-        id: create_tag
+        if: steps.compare_versions.outputs.created_tag == 'true'
         run: |
-          git tag -a v${{ env.version }} -m "Release v${{ env.version }}"
-          git push origin v${{ env.version }}
+          git tag -a v${{ steps.get_version.outputs.version }} -m "Release v${{ steps.get_version.outputs.version }}"
+          git push origin v${{ steps.get_version.outputs.version }}
         env:
           GITHUB_TOKEN: ${{ secrets.PAT }}
