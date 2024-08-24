@@ -1,4 +1,4 @@
-name: Create Tag
+name: Tag, Build, and Release
 
 on:
   push:
@@ -6,8 +6,12 @@ on:
       - main
 
 jobs:
-  create_tag:
+  tag-build-release:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        os: [windows-latest, macos-latest]
+
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -30,11 +34,6 @@ jobs:
         run: |
           git fetch --tags
           latest_tag=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
-          if [ "$latest_tag" = "v0.0.0" ]; then
-            echo "No existing tags found. Using v0.0.0 as the starting point."
-          else
-            echo "Latest tag: $latest_tag"
-          fi
           echo "latest_tag=$latest_tag" >> $GITHUB_OUTPUT
 
       - name: Compare versions
@@ -52,3 +51,115 @@ jobs:
         run: |
           git tag -a v${{ steps.get_version.outputs.version }} -m "Release v${{ steps.get_version.outputs.version }}"
           git push https://x-access-token:${{ secrets.PERSONAL_ACCESS_TOKEN }}@github.com/${{ github.repository }}.git v${{ steps.get_version.outputs.version }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.12.4'
+
+      - name: Cache PDM packages
+        uses: actions/cache@v3
+        with:
+          path: ~/.pdm/venv
+          key: ${{ matrix.os }}-pdm-${{ hashFiles('**/pdm.lock') }}
+          restore-keys: |
+            ${{ matrix.os }}-pdm-
+
+      - name: Install Python dependencies
+        run: |
+          cd backend
+          pip install pdm
+          pdm install
+
+      - uses: pnpm/action-setup@v4
+        name: Install pnpm
+        with:
+          version: 8
+          run_install: false
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20.11.0
+
+      - name: Cache pnpm modules
+        uses: actions/cache@v3
+        with:
+          path: frontend/node_modules
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('frontend/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Install frontend dependencies
+        run: |
+          cd frontend
+          pnpm install
+
+      - name: Build frontend
+        run: |
+          cd backend
+          pdm build-front
+
+      - name: Cache downloaded files
+        uses: actions/cache@v3
+        with:
+          path: ./hub_model/briaai
+          key: ${{ runner.os }}-downloads-${{ hashFiles('hub_model/download.py') }}
+
+      - name: Download files
+        run: |
+          cd backend
+          pdm run python hub_model/download.py
+
+      - name: Build with PyInstaller
+        run: |
+          cd backend
+          pdm build-release
+
+      - name: Create ZIP (macOS)
+        if: matrix.os == 'macos-latest'
+        run: |
+          cd backend/dist/release
+          zip -r ../../mac-binary-image-matting-${{ github.ref_name }}.zip .
+          cd ../../
+
+      - name: Create ZIP (Windows)
+        if: matrix.os == 'windows-latest'
+        working-directory: backend
+        run: |
+          Compress-Archive -Path .\dist\release\* -DestinationPath win-image-matting-${{ github.ref_name }}.zip
+        shell: pwsh
+
+      - name: Create Release
+        id: create_release
+        if: steps.compare_versions.outputs.created_tag == 'true'
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: v${{ steps.get_version.outputs.version }}
+          release_name: Image Matting v${{ steps.get_version.outputs.version }}
+          draft: false
+          prerelease: false
+
+      - name: Upload Windows Release Asset
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./win-image-matting-${{ github.ref_name }}.zip
+          asset_name: win-image-matting-${{ github.ref_name }}.zip
+          asset_content_type: application/zip
+        if: matrix.os == 'windows-latest'
+
+      - name: Upload macOS Release Asset
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./mac-binary-image-matting-${{ github.ref_name }}.zip
+          asset_name: mac-binary-image-matting-${{ github.ref_name }}.zip
+          asset_content_type: application/zip
+        if: matrix.os == 'macos-latest'
