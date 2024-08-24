@@ -26,42 +26,44 @@ jobs:
         id: get_version
         run: |
           version=$(grep "^version" backend/pyproject.toml | sed -E 's/version = "(.*)"/\1/')
-          echo "version=$version" >> $GITHUB_OUTPUT
+          echo "version=$version" >> $GITHUB_ENV
 
       - name: Get the latest tag
         id: get_latest_tag
         run: |
           git fetch --tags
           latest_tag=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
-          echo "latest_tag=$latest_tag" >> $GITHUB_OUTPUT
+          echo "latest_tag=$latest_tag" >> $GITHUB_ENV
 
       - name: Compare versions
         id: compare_versions
         run: |
-          if [ "v${{ steps.get_version.outputs.version }}" = "${{ steps.get_latest_tag.outputs.latest_tag }}" ]; then
+          if [ "v${{ env.version }}" = "${{ env.latest_tag }}" ]; then
             echo "Version has not changed. Skipping tag creation."
-            echo "created_tag=false" >> $GITHUB_OUTPUT
+            echo "created_tag=false" >> $GITHUB_ENV
           else
-            echo "created_tag=true" >> $GITHUB_OUTPUT
+            echo "created_tag=true" >> $GITHUB_ENV
           fi
 
       - name: Create a new tag
-        if: steps.compare_versions.outputs.created_tag == 'true'
+        if: env.created_tag == 'true'
         run: |
-          git tag -a v${{ steps.get_version.outputs.version }} -m "Release v${{ steps.get_version.outputs.version }}"
-          git push https://x-access-token:${{ secrets.PERSONAL_ACCESS_TOKEN }}@github.com/${{ github.repository }}.git v${{ steps.get_version.outputs.version }}
+          git tag -a v${{ env.version }} -m "Release v${{ env.version }}"
+          git push https://x-access-token:${{ secrets.PERSONAL_ACCESS_TOKEN }}@github.com/${{ github.repository }}.git v${{ env.version }}
 
   create-release:
     runs-on: ubuntu-latest
     needs: check-and-tag
     if: needs.check-and-tag.outputs.created_tag == 'true'
+    outputs:
+      upload_url: ${{ steps.create_release.outputs.upload_url }}
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
 
       - name: Create Release
         id: create_release
-        uses: actions/create-release@v1
+        uses: actions/create-release@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
@@ -73,8 +75,8 @@ jobs:
   build-and-upload:
     runs-on: ubuntu-latest
     needs: 
-       - check-and-tag
-       - create-release
+      - create-release
+      - check-and-tag
     if: needs.check-and-tag.outputs.created_tag == 'true'
     strategy:
       matrix:
